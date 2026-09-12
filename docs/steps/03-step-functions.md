@@ -1,6 +1,6 @@
 # Step 3 — Create a Step Function that calls Lambda
 
-**Status:** ⬜ Pending
+**Status:** ✅ Complete
 
 ## Objective
 
@@ -8,150 +8,66 @@ Build a state machine that invokes the Lambda function from Step 2.
 
 ## Prerequisites
 
-- [ ] Step 2 complete — Lambda function created and tested
+- [x] Step 2 complete — Lambda function created and tested
 
 ## Tasks
 
-- [ ] Create a Step Function state machine
-- [ ] Add a state that invokes the Lambda function
-- [ ] Test the state machine execution
+- [x] Create a Step Function state machine
+- [x] Add a state that invokes the Lambda function
+- [x] Test successful and failed executions
+- [x] Add explicit error handling
 
-## Verification
+## 3.1 Open AWS Step Functions
 
-- [ ] Step Function exists in `us-east-1`
-- [ ] Step Function successfully invokes the Lambda
-- [ ] Execution completes with expected output
+In the AWS Console, confirm the region is `us-east-1`. Open **AWS Step Functions → State machines → Create state machine**.
 
-tep 3 adds exactly one new AWS service: AWS Step Functions.
+Choose **Create from blank** or **Build from scratch**, then select the **Standard** state machine type. Standard workflows are appropriate here because the eventual workflow is long-running, auditable, and may involve retries, waiting, or human and agent interactions.
 
-Your goal is:
+Step 3 adds exactly one new AWS service. EventBridge is not added yet.
 
-Manual Start
+```text
+Manual start
     ↓
 Step Functions
     ↓
 project-x-poc-validator Lambda
     ↓
 Success
+```
 
-We are not adding EventBridge yet.
+## 3.2 Build the workflow in Workflow Studio
 
-Step 3.1 — Open AWS Step Functions
+In Workflow Studio, search for **Lambda** and drag **AWS Lambda — Invoke** between Start and End.
 
-In the AWS Console, confirm the region is:
+Select the Lambda state and choose `project-x-poc-validator` for **Function name**. Configure the payload so the Lambda receives the Step Functions state input unchanged. For example, this input:
 
-us-east-1
-
-Search for:
-
-Step Functions
-
-Open AWS Step Functions → State machines → Create state machine.
-
-Choose Create from blank / Build from scratch if presented.
-
-For the state machine type, select:
-
-Standard
-
-This is the type I want us to use for Project X because our eventual workflow is long-running, auditable, and may involve retries/waiting/human or agent interactions.
-
-Step 3.2 — Use Workflow Studio
-
-You should now see Workflow Studio.
-
-You'll have something resembling:
-
-Start
-  ↓
-End
-
-On the left side, search for:
-
-Lambda
-
-Find:
-
-AWS Lambda — Invoke
-
-Drag it between Start and End.
-
-Now visually:
-
-Start
-  ↓
-Lambda Invoke
-  ↓
-End
-
-Click the Lambda state.
-
-Step 3.3 — Select your Lambda
-
-For Function name, select the Lambda we created in Step 2:
-
-project-x-poc-validator
-
-For Payload/Input, we want the Lambda to receive the Step Functions input.
-
-Choose the option corresponding to using the state input as the payload.
-
-The important thing is that if Step Functions receives:
-
+```json
 {
   "requestId": "REQ-3001",
   "requestType": "CHANGE_ADDRESS",
   "customerId": "C12345"
 }
+```
 
-the Lambda should receive the same object as its event.
+should arrive at Lambda as the same event object.
 
-Step 3.4 — Rename the state
+Rename the state from `Lambda Invoke` to `ValidateRequest`:
 
-Rename:
-
-Lambda Invoke
-
-to:
-
-ValidateRequest
-
-Our workflow now reads nicely:
-
+```text
 Start
    ↓
 ValidateRequest
    ↓
 End
+```
 
-This matters later when we have:
+Use business-oriented state names. A future workflow might contain `IdentifyIntent`, `ExtractData`, `RunBusinessValidations`, `InvokeAgent`, `ExecuteTransaction`, and `Complete`.
 
-Start
-   ↓
-ValidateRequest
-   ↓
-IdentifyIntent
-   ↓
-ExtractData
-   ↓
-RunBusinessValidations
-   ↓
-InvokeAgent
-   ↓
-ExecuteTransaction
-   ↓
-Complete
+## 3.3 Review the generated Amazon States Language
 
-State names should describe business/workflow operations, rather than implementation details such as CallLambda1.
+Open the **Code** view. You should see something similar to:
 
-Step 3.5 — Look at the generated ASL
-
-Workflow Studio should have a Code view.
-
-Open it.
-
-You'll see something similar to:
-
+```json
 {
   "Comment": "Project X POC workflow",
   "StartAt": "ValidateRequest",
@@ -167,134 +83,39 @@ You'll see something similar to:
     }
   }
 }
+```
 
-Don't worry about memorizing this.
+This JSON is Amazon States Language (ASL). The important fields are:
 
-This JSON is called Amazon States Language (ASL).
+- `StartAt`: the first state.
+- `States`: the states in the workflow.
+- `Type: Task`: a state that performs work.
+- `Resource`: the AWS service or action called.
+- `End: true`: the workflow finishes at this state.
 
-The important concepts are:
+## 3.4 Create the state machine and review IAM
 
-StartAt
-   ↓
-Which state starts first?
+Click **Create**, name the state machine `project-x-poc-workflow`, and let Step Functions create a new execution role if prompted.
 
-States
-   ↓
-What states exist?
+The state machine role needs permission to invoke `project-x-poc-validator`:
 
-Type: Task
-   ↓
-This state performs work.
-
-Resource
-   ↓
-What AWS service/action is called?
-
-End: true
-   ↓
-Workflow finishes here.
-
-This becomes important later when we move the workflow into IaC/GitHub.
-
-Step 3.6 — Create the state machine
-
-Click Create.
-
-Name it:
-
-project-x-poc-workflow
-
-For permissions, let Step Functions create a new execution role.
-
-You may see something like:
-
-Create new role
-
-Select that.
-
-Then create the state machine.
-
-AWS will create something similar to:
-
-project-x-poc-workflow
-
-and an IAM role similar to:
-
-StepFunctions-project-x-poc-workflow-role-xxxxx
-Step 3.7 — Understand the IAM relationship
-
-This is an important AWS concept.
-
-In Step 2:
-
-YOU
- ↓
-Lambda
- ↓
-Lambda Execution Role
-
-Now:
-
-YOU
+```text
+You
  ↓
 Step Functions
- ↓
-Step Functions Execution Role
- ↓
+ ↓  Step Functions execution role
 Lambda
- ↓
-Lambda Execution Role
+ ↓  Lambda execution role
+AWS services and CloudWatch Logs
+```
 
-There are two different roles.
+These are two different roles. Step Functions needs `lambda:InvokeFunction`; the Lambda execution role allows the function to write logs and call any services it requires.
 
-Step Functions role
+## 3.5 Run the first workflow
 
-Needs permission to:
+Open `project-x-poc-workflow`, click **Start execution**, and use:
 
-lambda:InvokeFunction
-
-on:
-
-project-x-poc-validator
-Lambda role
-
-Allows the Lambda itself to do things such as:
-
-write CloudWatch logs
-
-Think of it as:
-
-Every AWS service needs permission to perform the next action.
-
-This idea will become extremely important later:
-
-EventBridge
-   ↓ permission
-Step Functions
-
-Step Functions
-   ↓ permission
-Lambda
-
-Lambda
-   ↓ permission
-AgentCore
-
-AgentCore
-   ↓ permission
-Bedrock
-Step 3.8 — Run your first workflow
-
-Open:
-
-project-x-poc-workflow
-
-Click:
-
-Start execution
-
-For input, paste:
-
+```json
 {
   "requestId": "REQ-3001",
   "requestType": "CHANGE_ADDRESS",
@@ -306,43 +127,13 @@ For input, paste:
     "zip": "32256"
   }
 }
+```
 
-Click:
+The execution should show `Start → ValidateRequest → Success`, with status **Succeeded**. Inspect the state's Input and Output.
 
-Start execution.
+The Lambda integration may wrap the response like this:
 
-Step 3.9 — Watch the execution
-
-This is one of the useful features of Step Functions.
-
-You should see:
-
-Start
-   ↓
-ValidateRequest
-   ↓
-Success
-
-The ValidateRequest state should turn green.
-
-Execution status:
-
-Succeeded
-
-Click ValidateRequest.
-
-Look at its:
-
-Input
-
-Output
-
-The input should contain your request.
-
-The output will probably look somewhat different from what you expect.
-
-You may see something like:
-
+```json
 {
   "ExecutedVersion": "$LATEST",
   "Payload": {
@@ -351,442 +142,111 @@ You may see something like:
     "validationStatus": "VALID",
     "message": "Project X request passed initial validation"
   },
-  "SdkHttpMetadata": {
-    ...
-  },
   "StatusCode": 200
 }
+```
 
-Notice this part:
+## 3.6 Keep only the Lambda payload
 
-"Payload": {
-   ...
-}
+Edit the state machine, select `ValidateRequest`, and find the output or result settings. Depending on the console version, this may be called **Output**, **Result selector**, or a JSONata output expression.
 
-Your Lambda response is wrapped by the Step Functions Lambda integration.
+Configure the task to pass only the Lambda response payload to the next state. A Workflow Studio output expression is commonly:
 
-We'll clean that up.
-
-Step 3.10 — Make Lambda output cleaner
-
-Go back to:
-
-State machines
-→ project-x-poc-workflow
-→ Edit
-
-Select:
-
-ValidateRequest
-
-Look for the output/result settings.
-
-Depending on the current console UI, you may see options such as Output, Result selector, or a JSONata output expression.
-
-We want the next state to receive only the Lambda's Payload, not all the Lambda invocation metadata.
-
-Conceptually:
-
-Lambda integration result
-
-{
-   Payload: {...},
-   StatusCode: 200,
-   metadata: ...
-}
-
-             ↓
-
-Keep Payload
-
-             ↓
-
-{
-   requestId: ...,
-   validationStatus: "VALID"
-}
-
-If your Workflow Studio offers an Output expression for the Lambda task, set it to the Lambda response payload, commonly:
-
+```text
 {% $states.result.Payload %}
+```
 
-Then save/update the state machine.
+Save or update the state machine. If the console presents different controls, a successful workflow is the priority for this step.
 
-If your console presents a different input/output UI, don't get stuck here; the workflow succeeding is more important for this step.
+Run another execution with:
 
-Step 3.11 — Execute again
-
-Start another execution:
-
+```json
 {
   "requestId": "REQ-3002",
   "requestType": "CHANGE_ADDRESS",
   "customerId": "C99999"
 }
+```
 
-Expected:
+The final output should contain the request fields plus `validationStatus: "VALID"` and the validation message.
 
-Start
-  ↓
-ValidateRequest
-  ↓
-Succeeded
+## 3.7 Test an invalid request
 
-And ideally the final workflow output is:
+Start an execution without `requestId`:
 
-{
-  "requestId": "REQ-3002",
-  "requestType": "CHANGE_ADDRESS",
-  "validationStatus": "VALID",
-  "message": "Project X request passed initial validation"
-}
-
-Now we have a very clean pipeline:
-
-INPUT
-
-{
- requestId,
- requestType,
- customerId
-}
-
-       ↓
-
-Step Functions
-
-       ↓
-
-ValidateRequest
-
-       ↓
-
-Lambda
-
-       ↓
-
-OUTPUT
-
-{
- requestId,
- requestType,
- validationStatus
-}
-Step 3.12 — Now deliberately make it fail
-
-This is important.
-
-Start another execution with:
-
+```json
 {
   "requestType": "CHANGE_ADDRESS",
   "customerId": "C12345"
 }
+```
 
-Notice:
+The `ValidateRequest` state should fail with an error such as:
 
-requestId
+```text
+ValueError: requestId is required
+```
 
-is missing.
+This demonstrates both paths:
 
-Remember our Lambda contains:
+```text
+Valid request   → Lambda → VALID     → workflow succeeds
+Invalid request → Lambda → ValueError → workflow fails
+```
 
-if not request_id:
-    raise ValueError("requestId is required")
+## 3.8 Add explicit error handling
 
-Run the workflow.
+Add a **Fail** state named `ValidationFailed`. On `ValidateRequest`, add a **Catch** handler with `States.ALL` and route it to `ValidationFailed`:
 
-This time you should see:
-
-Start
-   ↓
-ValidateRequest
-   ↓
-FAILED
-
-The state should turn red.
-
-Click the failed state.
-
-You should find an error indicating:
-
-ValueError
-
-requestId is required
-
-This is actually a successful test.
-
-You've demonstrated:
-
-VALID REQUEST
-
-Step Functions
-     ↓
-Lambda
-     ↓
-VALID
-     ↓
-Workflow succeeds
-
-
-INVALID REQUEST
-
-Step Functions
-     ↓
-Lambda
-     ↓
-ValueError
-     ↓
-Workflow fails
-Step 3.13 — Add error handling
-
-Now let's make the workflow slightly more realistic.
-
-Instead of:
-
-ValidateRequest
-     ↓
-ERROR
-     ↓
-Entire execution crashes
-
-we want:
-
-ValidateRequest
-       |
-   +---+---+
-   |       |
-success   error
-   |       |
-   v       v
-Complete  ValidationFailed
-
-Edit your state machine.
-
-Add a Fail state after/alongside the validation task.
-
-Name it:
-
-ValidationFailed
-
-Select:
-
-ValidateRequest
-
-Look for:
-
-Error handling
-
-or Catch.
-
-Add a Catch handler.
-
-Use:
-
-States.ALL
-
-as the error type.
-
-Set the fallback state to:
-
-ValidationFailed
-
-Conceptually the ASL will contain something similar to:
-
+```json
 "Catch": [
   {
-    "ErrorEquals": [
-      "States.ALL"
-    ],
+    "ErrorEquals": ["States.ALL"],
     "Next": "ValidationFailed"
   }
 ]
+```
 
-This means:
+The failure path is now explicit:
 
-If anything goes wrong in ValidateRequest, don't simply terminate unexpectedly. Route execution to ValidationFailed.
+```text
+ValidateRequest
+    ├── success → Complete
+    └── error   → ValidationFailed
+```
 
-Step 3.14 — Test the failure again
+Run the invalid request again. The execution should end at `ValidationFailed`, which is still a failed execution because it is a Fail state, but the workflow now controls how validation errors are handled.
 
-Use:
+## 3.9 Review execution history and the CLI
 
-{
-  "requestType": "CHANGE_ADDRESS"
-}
+Open a successful execution and review **Execution event history**. You should see events such as `ExecutionStarted`, `TaskStateEntered`, `LambdaFunctionScheduled`, `LambdaFunctionStarted`, `LambdaFunctionSucceeded`, `TaskStateExited`, and `ExecutionSucceeded`.
 
-Now visually you should see something like:
+This history provides an orchestration and audit trail for a request as it moves through the workflow.
 
-          ValidateRequest
-             /     \
-            /       \
-       Success      Error
-          |           |
-          v           v
-       Complete   ValidationFailed
+From your Mac, run:
 
-The workflow still ends in failure because ValidationFailed is a Fail state, but now you explicitly control how that failure is handled.
-
-That's a major orchestration concept.
-
-Later Project X might do:
-
-Validation failed
-       ↓
-Determine failure type
-       ↓
-Business validation?
-   YES / NO
-    |     |
-    v     v
-Request   Technical
-more info retry
-    |       |
-    v       v
-Email     Retry
-customer  system
-
-This is one of the reasons Step Functions is valuable for your architecture.
-
-Step 3.15 — Look at execution history
-
-Open one successful execution.
-
-Look for:
-
-Execution event history
-
-You'll see events somewhat like:
-
-ExecutionStarted
-
-TaskStateEntered
-
-LambdaFunctionScheduled
-
-LambdaFunctionStarted
-
-LambdaFunctionSucceeded
-
-TaskStateExited
-
-ExecutionSucceeded
-
-Don't memorize these.
-
-The important idea is that Step Functions records what happened to the workflow.
-
-This gives us an orchestration/audit trail.
-
-For Project X, that eventually becomes very valuable when someone asks:
-
-What happened to request REQ-58423?
-
-We want to be able to reconstruct:
-
-Request received
-      ↓
-Intent identified
-      ↓
-Data extracted
-      ↓
-Validation executed
-      ↓
-Agent invoked
-      ↓
-Tool called
-      ↓
-Transaction submitted
-      ↓
-Completed
-Step 3.16 — Look at your state machine from CLI
-
-Back on your Mac:
-
+```bash
 aws stepfunctions list-state-machines \
   --region us-east-1
+```
 
-You should see:
+You should see `project-x-poc-workflow` and its ARN, similar to:
 
-project-x-poc-workflow
+```text
+arn:aws:states:us-east-1:YOUR_ACCOUNT:stateMachine:project-x-poc-workflow
+```
 
-You'll also see its ARN:
+## Verification checklist
 
-arn:aws:states:us-east-1:
-YOUR_ACCOUNT:
-stateMachine:project-x-poc-workflow
-
-An ARN is the AWS resource identifier.
-
-You'll see ARNs everywhere:
-
-Lambda ARN
-Step Functions ARN
-IAM Role ARN
-EventBridge ARN
-AgentCore Runtime ARN
-Step 3.17 — What you have built so far
-
-After Steps 1–3, you now actually have this:
-
-                    AWS ACCOUNT
-                     us-east-1
-
-                         |
-                         |
-                +----------------+
-                | Step Functions |
-                |                |
-                | Project X POC  |
-                +-------+--------+
-                        |
-                        |
-                        v
-              +--------------------+
-              | Lambda             |
-              |                    |
-              | project-x-poc-     |
-              | validator          |
-              +---------+----------+
-                        |
-                        |
-                        v
-                CloudWatch Logs
-
-And you've already touched four important AWS concepts:
-
-AWS Service
-     +
-IAM Role
-     +
-ARN
-     +
-CloudWatch
-
-These same concepts repeat throughout AWS.
-
-Step 3 checklist
-
-Before going further, make sure:
-
-[ ] project-x-poc-workflow exists
-
-[ ] State machine type = Standard
-
-[ ] ValidateRequest invokes project-x-poc-validator
-
-[ ] Valid request succeeds
-
-[ ] Lambda output is visible
-
-[ ] Invalid request fails
-
-[ ] ValidationFailed/Catch is configured
-
-[ ] Execution history makes sense
-
-[ ] aws stepfunctions list-state-machines works
-
-If those are working, Step 3 is complete.
+- [x] `project-x-poc-workflow` exists in `us-east-1`
+- [x] State machine type is Standard
+- [x] `ValidateRequest` invokes `project-x-poc-validator`
+- [x] A valid request succeeds
+- [x] Lambda output is visible
+- [x] An invalid request fails with `requestId is required`
+- [x] `ValidationFailed` and `Catch` are configured
+- [x] Execution history is available
+- [x] `aws stepfunctions list-state-machines` works
 
 ## Next Step
 

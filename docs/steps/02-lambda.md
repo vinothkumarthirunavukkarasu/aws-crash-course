@@ -1,6 +1,6 @@
 # Step 2 — Create one Lambda manually and test it
 
-**Status:** ⬜ Pending
+**Status:** ✅ Complete
 
 ## Objective
 
@@ -588,13 +588,13 @@ This Lambda becomes the first state in our Project X workflow.
 
 Before moving on, verify these:
 
-- [ ] `project-x-poc-validator` exists
-- [ ] Python code deployed
-- [ ] Valid test returns `validationStatus = VALID`
-- [ ] Missing `requestId` throws an error
-- [ ] CloudWatch contains the logs
-- [ ] `aws lambda list-functions` sees the Lambda
-- [ ] CLI invocation works
+- [x] `project-x-poc-validator` exists
+- [x] Python code deployed
+- [x] Valid test returns `validationStatus = VALID`
+- [x] Missing `requestId` throws an error
+- [x] CloudWatch contains the logs
+- [x] `aws lambda list-functions` sees the Lambda
+- [x] CLI invocation works
 
 If those work, Step 2 is complete.
 
