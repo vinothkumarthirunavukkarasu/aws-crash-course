@@ -1,0 +1,275 @@
+Resources:
+  ValidatorFunctionServiceRole072370F9:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+    Metadata:
+      aws:cdk:path: ProjectXPocCdkStack/ValidatorFunction/ServiceRole/Resource
+  ValidatorFunction3E7569DB:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: cdk-hnb659fds-assets-016811564648-us-east-1
+        S3Key: 14655decd1d88eafbb696c3922fad060c39cb16e6339244d43090a0233b57e59.zip
+      FunctionName: project-x-cdk-validator
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt:
+          - ValidatorFunctionServiceRole072370F9
+          - Arn
+      Runtime: python3.12
+      Timeout: 30
+    DependsOn:
+      - ValidatorFunctionServiceRole072370F9
+    Metadata:
+      aws:cdk:path: ProjectXPocCdkStack/ValidatorFunction/Resource
+      aws:asset:path: asset.14655decd1d88eafbb696c3922fad060c39cb16e6339244d43090a0233b57e59
+      aws:asset:is-bundled: false
+      aws:asset:property: Code
+  ValidatorFunctionLogGroup8ACFFC29:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        Fn::Join:
+          - ""
+          - - /aws/lambda/
+            - Ref: ValidatorFunction3E7569DB
+      RetentionInDays: 731
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Metadata:
+      aws:cdk:path: ProjectXPocCdkStack/ValidatorFunction/LogGroup/Resource
+  ProjectXWorkflowRoleA1756577:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+        Version: "2012-10-17"
+    Metadata:
+      aws:cdk:path: ProjectXPocCdkStack/ProjectXWorkflow/Role/Resource
+  ProjectXWorkflowRoleDefaultPolicy1B407FF2:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action: lambda:InvokeFunction
+            Effect: Allow
+            Resource:
+              - Fn::GetAtt:
+                  - ValidatorFunction3E7569DB
+                  - Arn
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - ValidatorFunction3E7569DB
+                        - Arn
+                    - :*
+        Version: "2012-10-17"
+      PolicyName: ProjectXWorkflowRoleDefaultPolicy1B407FF2
+      Roles:
+        - Ref: ProjectXWorkflowRoleA1756577
+    Metadata:
+      aws:cdk:path: ProjectXPocCdkStack/ProjectXWorkflow/Role/DefaultPolicy/Resource
+  ProjectXWorkflowBD422CC2:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      DefinitionString:
+        Fn::Join:
+          - ""
+          - - '{"StartAt":"ValidateRequest","States":{"ValidateRequest":{"End":true,"Retry":[{"ErrorEquals":["Lambda.ClientExecutionTimeoutException","Lambda.ServiceException","Lambda.AWSLambdaException","Lambda.SdkClientException"],"IntervalSeconds":2,"MaxAttempts":6,"BackoffRate":2}],"Catch":[{"ErrorEquals":["States.ALL"],"ResultPath":"$.error","Next":"ValidationFailed"}],"Type":"Task","OutputPath":"$.Payload","Resource":"arn:'
+            - Ref: AWS::Partition
+            - :states:::lambda:invoke","Parameters":{"FunctionName":"
+            - Fn::GetAtt:
+                - ValidatorFunction3E7569DB
+                - Arn
+            - '","Payload.$":"$"}},"ValidationFailed":{"Type":"Fail","Error":"ValidationError","Cause":"Request validation failed"}},"TimeoutSeconds":300}'
+      RoleArn:
+        Fn::GetAtt:
+          - ProjectXWorkflowRoleA1756577
+          - Arn
+      StateMachineName: project-x-cdk-workflow
+    DependsOn:
+      - ProjectXWorkflowRoleDefaultPolicy1B407FF2
+      - ProjectXWorkflowRoleA1756577
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Metadata:
+      aws:cdk:path: ProjectXPocCdkStack/ProjectXWorkflow/Resource
+  ProjectXWorkflowEventsRole98CED3E0:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+        Version: "2012-10-17"
+    Metadata:
+      aws:cdk:path: ProjectXPocCdkStack/ProjectXWorkflow/EventsRole/Resource
+  ProjectXWorkflowEventsRoleDefaultPolicy243ECF71:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action: states:StartExecution
+            Effect: Allow
+            Resource:
+              Ref: ProjectXWorkflowBD422CC2
+        Version: "2012-10-17"
+      PolicyName: ProjectXWorkflowEventsRoleDefaultPolicy243ECF71
+      Roles:
+        - Ref: ProjectXWorkflowEventsRole98CED3E0
+    Metadata:
+      aws:cdk:path: ProjectXPocCdkStack/ProjectXWorkflow/EventsRole/DefaultPolicy/Resource
+  ProjectXEventBusE7B85220:
+    Type: AWS::Events::EventBus
+    Properties:
+      Name: project-x-cdk-bus
+    Metadata:
+      aws:cdk:path: ProjectXPocCdkStack/ProjectXEventBus/Resource
+  RequestReceivedRule5D174BFD:
+    Type: AWS::Events::Rule
+    Properties:
+      EventBusName:
+        Ref: ProjectXEventBusE7B85220
+      EventPattern:
+        detail-type:
+          - RequestReceived
+        source:
+          - projectx.requests
+      Name: project-x-cdk-request-received-rule
+      State: ENABLED
+      Targets:
+        - Arn:
+            Ref: ProjectXWorkflowBD422CC2
+          Id: Target0
+          InputPath: $.detail
+          RoleArn:
+            Fn::GetAtt:
+              - ProjectXWorkflowEventsRole98CED3E0
+              - Arn
+    Metadata:
+      aws:cdk:path: ProjectXPocCdkStack/RequestReceivedRule/Resource
+  ProjectXHttpApiB5FFA949:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Description: Project X CDK POC API
+      Name: project-x-cdk-api
+      ProtocolType: HTTP
+    Metadata:
+      aws:cdk:path: ProjectXPocCdkStack/ProjectXHttpApi/Resource
+  ProjectXHttpApiDefaultStage84AEE17C:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId:
+        Ref: ProjectXHttpApiB5FFA949
+      AutoDeploy: true
+      StageName: $default
+    Metadata:
+      aws:cdk:path: ProjectXPocCdkStack/ProjectXHttpApi/DefaultStage/Resource
+  ProjectXHttpApiPOSTrequestsInvokeRole511F4FFA:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+        Version: "2012-10-17"
+    Metadata:
+      aws:cdk:path: ProjectXPocCdkStack/ProjectXHttpApi/POST--requests/InvokeRole/Resource
+  ProjectXHttpApiPOSTrequestsInvokeRoleDefaultPolicyC4C092F9:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action: events:PutEvents
+            Effect: Allow
+            Resource:
+              Fn::GetAtt:
+                - ProjectXEventBusE7B85220
+                - Arn
+            Sid: AllowEventBridgePutEvents
+        Version: "2012-10-17"
+      PolicyName: ProjectXHttpApiPOSTrequestsInvokeRoleDefaultPolicyC4C092F9
+      Roles:
+        - Ref: ProjectXHttpApiPOSTrequestsInvokeRole511F4FFA
+    Metadata:
+      aws:cdk:path: ProjectXPocCdkStack/ProjectXHttpApi/POST--requests/InvokeRole/DefaultPolicy/Resource
+  ProjectXHttpApiPOSTrequestsProjectXEventBridgeIntegrationAFF31164:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId:
+        Ref: ProjectXHttpApiB5FFA949
+      ConnectionType: INTERNET
+      CredentialsArn:
+        Fn::GetAtt:
+          - ProjectXHttpApiPOSTrequestsInvokeRole511F4FFA
+          - Arn
+      IntegrationSubtype: EventBridge-PutEvents
+      IntegrationType: AWS_PROXY
+      PayloadFormatVersion: "1.0"
+      RequestParameters:
+        Detail: $request.body
+        DetailType: RequestReceived
+        Source: projectx.requests
+        EventBusName:
+          Ref: ProjectXEventBusE7B85220
+    Metadata:
+      aws:cdk:path: ProjectXPocCdkStack/ProjectXHttpApi/POST--requests/ProjectXEventBridgeIntegration/Resource
+  ProjectXHttpApiPOSTrequests9C946E77:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId:
+        Ref: ProjectXHttpApiB5FFA949
+      AuthorizationType: NONE
+      RouteKey: POST /requests
+      Target:
+        Fn::Join:
+          - ""
+          - - integrations/
+            - Ref: ProjectXHttpApiPOSTrequestsProjectXEventBridgeIntegrationAFF31164
+    Metadata:
+      aws:cdk:path: ProjectXPocCdkStack/ProjectXHttpApi/POST--requests/Resource
+  CDKMetadata:
+    Type: AWS::CDK::Metadata
+    Properties:
+      Analytics: v2:deflate64:H4sIAAAAAAAA/81UUWvbMBD+LdVjUbQ1gcHylpR2C3RbSPoWSrhaF0eLLBnrlGCE//uQbAenpfRhG/RJuu9O330nnW4sxl++is9XcHKjTB5GWj2LsCbIDhxObhs0FM8SRLj3JiNlzSawXbf9CQWyKbtmnJEq0HrqrMzK3rEHIzVWnVV5EyOT1Tzx253paRuuoBBhZTVuAgPnfIFyXrNpYGWlTKZK0LMss970SdqYeGCWGFpSzgowkKNcWq0yhY5NN+ECq2dVF/vU8L9JlU5L+WiX/amWP2bsuIkg2y+MVgbPPnbN3ndWVuPgej+myH+h6qWY/yE1NVqUwFs8oucDjzZ6XvG8hqVcExAWaMj1kj4cUSq1rbLhbrIF55CcmMWFu4mY++yANAeHiYZrmzsRHmz+rbK+3ASmu+25+VrKPqLhjrDsB4AT4R6U5knGD8j2ysTfK3GnjIoBcyvrrhHcIOaNwXFugFjoxdsnDcMsL3RsCdzBiYc0qxbmaA/I8RjvRYS7uM69i0SRprf5yqdZk+KWQIRxLkT1BEo/1mUv0VlfZdiPl8pf/Ezs2IYF3F0wbt6hPPc9VDnSsOAosOFQqhwIT1AfxyJ8JypnpUotnF7wdmdmpeIRXxPk3bu215VjwlfWU4dHc2EI8wrSMO+DB1j7WTxh0/DUN5FImTzivzyVnhq+rGlvzaeJuBmLm6vfTqlRN9rFql3/ADa6s9JXBgAA
+    Metadata:
+      aws:cdk:path: ProjectXPocCdkStack/CDKMetadata/Default
+Outputs:
+  ApiEndpoint:
+    Value:
+      Fn::GetAtt:
+        - ProjectXHttpApiB5FFA949
+        - ApiEndpoint
+  EventBusName:
+    Value:
+      Ref: ProjectXEventBusE7B85220
+  WorkflowArn:
+    Value:
+      Ref: ProjectXWorkflowBD422CC2
+Parameters:
+  BootstrapVersion:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /cdk-bootstrap/hnb659fds/version
+    Description: Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]
+
