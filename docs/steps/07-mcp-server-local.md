@@ -4,24 +4,22 @@
 
 ## Objective
 
-Build a Model Context Protocol (MCP) server on your Mac.
+Build and test a local Model Context Protocol (MCP) 2.x server with customer tools.
 
 ## Prerequisites
 
-- [x] Python 3.10+ installed (verified in Step 1)
+- [x] Python 3.10+ installed
+- [x] A terminal and local project checkout
 
 ## Tasks
 
-- [x] Set up a Python project for the MCP server
-- [x] Implement a simple MCP server with at least one tool
-- [x] Test the MCP server locally
+- [x] Create an isolated Python environment
+- [x] Install MCP 2.x
+- [x] Implement customer tools
+- [x] Run the server over Streamable HTTP
+- [x] Connect with an MCP client and call the tools
 
-## Verification
-
-- [x] MCP server starts successfully
-- [x] MCP server responds to tool calls locally
-
-## Overview — Build a local MCP 2.x server
+Step 7 — Build a local MCP 2.x server
 
 Target:
 
@@ -116,7 +114,7 @@ touch server.py
 
 Use this:
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server import MCPServer
 
 
 mcp = MCPServer(
@@ -246,7 +244,7 @@ if __name__ == "__main__":
 
 In MCP 2.x, the high-level server is:
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server import MCPServer
 
 instead of the old:
 
@@ -858,41 +856,41 @@ Our only objective right now is:
 
 Can I expose Python capabilities as MCP 2.x tools
 and call them through MCP?
-## Step 7 completion checklist
+Step 7 completion checklist
 
 You're done with Step 7 when:
 
-- [x] customer-tools/.venv exists
+[ ] customer-tools/.venv exists
 
-- [x] which python points to customer-tools/.venv
+[ ] which python points to customer-tools/.venv
 
-- [x] pip show mcp reports 2.x
+[ ] pip show mcp reports 2.x
 
-- [x] MCPServer import works
+[ ] MCPServer import works
 
-- [x] server.py starts
+[ ] server.py starts
 
-- [x] localhost:8000/mcp is available
+[ ] localhost:8000/mcp is available
 
-- [x] client.py connects
+[ ] client.py connects
 
-- [x] tools/list returns:
+[ ] tools/list returns:
     get_customer
     validate_address
     update_customer_address
 
-- [x] get_customer("C12345") works
+[ ] get_customer("C12345") works
 
-- [x] valid address returns valid=true
+[ ] valid address returns valid=true
 
-- [x] invalid ZIP returns valid=false
+[ ] invalid ZIP returns valid=false
 
-- [x] update_customer_address works
+[ ] update_customer_address works
 
-- [x] subsequent get_customer shows new address
+[ ] subsequent get_customer shows new address
 
-Once this works, Step 8 will take this exact MCP 2.x server and make it deployable to Amazon Bedrock AgentCore Runtime, including the container/runtime requirements and local deployment testing. AgentCore currently requires an ARM64 container, port 8000, and /mcp for MCP workloads.
+Once this works, Step 8 will take this exact MCP 2.x server and make it deployable to Amazon Bedrock AgentCore Runtime, including the container/runtime requirements and local deployment testing. AgentCore currently requires an ARM64 container, port 8000, and /mcp for MCP workloads
 
 ## Next Step
 
-Proceed to [Step 8 — Deploy the MCP server to AgentCore Runtime](08-mcp-server-agentcore.md).
+Proceed to [Step 8 — Deploy the MCP server to AWS](08-mcp-server-aws.md).
