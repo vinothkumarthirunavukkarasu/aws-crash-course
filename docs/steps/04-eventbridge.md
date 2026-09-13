@@ -17,18 +17,23 @@ Schedule or event-trigger the Step Function from Step 3.
 - [x] Configure the rule to trigger the Step Function
 - [x] Test matching and non-matching events
 
+## Overview
+
 Step 4 is where your POC becomes event-driven.
 
 Right now you manually start Step Functions:
 
+```text
 You
  ↓
 Step Functions
  ↓
 ValidateRequest Lambda
+```
 
 After Step 4:
 
+```text
 You send an event
       ↓
 EventBridge custom bus
@@ -38,27 +43,15 @@ EventBridge rule
 Step Functions starts automatically
       ↓
 ValidateRequest Lambda
+```
 
 AWS supports using a Step Functions state machine as an EventBridge rule target.
 
 ## 4.1 Create a custom EventBridge bus
 
-Open:
+Open **AWS Console → Amazon EventBridge → Event buses**, then click **Create event bus**.
 
-AWS Console
-→ Amazon EventBridge
-
-In the left menu, choose:
-
-Event buses
-
-Click:
-
-Create event bus
-
-Name:
-
-project-x-poc-bus
+Name the bus `project-x-poc-bus`.
 
 Leave other settings at default for now.
 
@@ -66,16 +59,13 @@ Create it.
 
 A custom event bus is useful here because it gives your application events their own place instead of mixing them into the AWS account's default bus. EventBridge custom buses are intended for events from your own applications/services.
 
-Your architecture is now:
-
-project-x-poc-bus
-
-but nothing is sending events to it yet.
+Your architecture now has the `project-x-poc-bus` bus, but nothing is sending events to it yet.
 
 ## 4.2 Understand the EventBridge event format
 
 We will send an event like this:
 
+```json
 {
   "Source": "projectx.requests",
   "DetailType": "RequestReceived",
@@ -85,85 +75,40 @@ We will send an event like this:
     "customerId": "C12345"
   }
 }
+```
 
 There are three important parts:
 
-Source
-DetailType
-Detail
+| Field | POC value | Meaning |
+| --- | --- | --- |
+| `Source` | `projectx.requests` | The event came from the Project X request-processing domain. |
+| `DetailType` | `RequestReceived` | A new request has arrived. |
+| `Detail` | The business payload | The request data to process. |
 
-For our POC:
-
-Source
-=
-projectx.requests
-
-Meaning:
-
-This event came from the Project X request-processing domain.
-
-Then:
-
-DetailType
-=
-RequestReceived
-
-Meaning:
-
-A new request has arrived.
-
-And:
-
-Detail
-=
-actual business payload
-
-AWS requires Source, DetailType, and Detail for custom PutEvents entries.
+AWS requires `Source`, `DetailType`, and `Detail` for custom `PutEvents` entries.
 
 ## 4.3 Create an EventBridge rule
 
-Now we need to tell EventBridge:
+Now we need to tell EventBridge: whenever a `RequestReceived` event from `projectx.requests` arrives, start the Step Functions workflow.
 
-Whenever a RequestReceived event from projectx.requests arrives, start my Step Functions workflow.
+Go to **EventBridge → Rules → Create rule** and use:
 
-Go to:
-
-EventBridge
-→ Rules
-
-Click:
-
-Create rule
-
-Use:
-
-Name:
-project-x-request-received-rule
-
-Description:
-
-Starts Project X workflow when a new request is received
-
-For Event bus, select:
-
-project-x-poc-bus
-
-Rule type:
-
-Rule with an event pattern
+| Setting | Value |
+| --- | --- |
+| Name | `project-x-request-received-rule` |
+| Description | Starts Project X workflow when a new request is received |
+| Event bus | `project-x-poc-bus` |
+| Rule type | Rule with an event pattern |
 
 Continue.
 
 ## 4.4 Configure the event pattern
 
-Choose:
-
-Custom pattern
-
-or the equivalent option in the current console.
+Choose **Custom pattern**, or the equivalent option in the current console.
 
 Paste:
 
+```json
 {
   "source": [
     "projectx.requests"
@@ -172,37 +117,15 @@ Paste:
     "RequestReceived"
   ]
 }
+```
 
-This means:
-
-IF
-
-source == projectx.requests
-
-AND
-
-detail-type == RequestReceived
-
-THEN
-
-match the event
+This means the event matches if `source == projectx.requests` **and** `detail-type == RequestReceived`.
 
 EventBridge rules compare incoming events to their event pattern and route matching events to targets.
 
 Notice we are not checking the request type yet.
 
-So both of these will match:
-
-CHANGE_ADDRESS
-
-and:
-
-CANCEL_POLICY
-
-as long as:
-
-source = projectx.requests
-detail-type = RequestReceived
+So both `CHANGE_ADDRESS` and `CANCEL_POLICY` will match as long as `source = projectx.requests` and `detail-type = RequestReceived`.
 
 That's intentional.
 
@@ -210,45 +133,29 @@ The workflow can decide what to do with the request later.
 
 ## 4.5 Configure the target
 
-Now EventBridge asks:
-
-Select target
-
-Choose:
-
-AWS service
-
-Then select:
-
-Step Functions state machine
-
-For state machine:
-
-project-x-poc-workflow
+For **Select target**, choose **AWS service → Step Functions state machine**. Select `project-x-poc-workflow`.
 
 Now EventBridge knows:
 
+```text
 matching event
     ↓
 project-x-poc-workflow
+```
+
 ## 4.6 Let EventBridge create an IAM role
 
 EventBridge needs permission to start your state machine.
 
 You will see an execution-role section.
 
-Choose something like:
-
-Create a new role for this specific resource
-
-AWS may generate a role name similar to:
-
-Amazon_EventBridge_Invoke_Step_Functions_xxxxx
+Choose **Create a new role for this specific resource** or a similarly named option. AWS may generate a role name like `Amazon_EventBridge_Invoke_Step_Functions_xxxxx`.
 
 That's fine.
 
 Conceptually:
 
+```text
 EventBridge
     |
     | IAM permission:
@@ -256,21 +163,27 @@ EventBridge
     |
     v
 Step Functions
+```
 
 This is the same AWS security concept you've already seen:
 
+```text
 Step Functions
     ↓ permission
 Lambda
+```
 
 Now you're adding:
 
+```text
 EventBridge
     ↓ permission
 Step Functions
+```
 
 Your permission chain is becoming:
 
+```text
 EventBridge IAM Role
       ↓
 StartExecution
@@ -280,6 +193,7 @@ Step Functions IAM Role
 InvokeFunction
       ↓
 Lambda
+```
 
 This is a very important AWS architecture pattern.
 
@@ -289,6 +203,7 @@ This is where I want you to pay attention.
 
 If EventBridge sends the entire event to Step Functions, your state machine receives something like:
 
+```json
 {
   "version": "0",
   "id": "abcd-1234",
@@ -304,56 +219,36 @@ If EventBridge sends the entire event to Step Functions, your state machine rece
     "customerId": "C12345"
   }
 }
+```
 
 But your Lambda currently expects:
 
+```json
 {
   "requestId": "REQ-4001",
   "requestType": "CHANGE_ADDRESS"
 }
+```
 
 Notice the problem?
 
-The data would be inside:
-
-detail.requestId
-
-instead of:
-
-requestId
-
-So for this POC, configure the EventBridge target to send only:
-
-$.detail
-
-to Step Functions.
+The data would be inside `detail.requestId` instead of `requestId`. For this POC, configure the EventBridge target to send only `$.detail` to Step Functions.
 
 ## 4.8 Configure target input
 
-When configuring the Step Functions target, look for:
-
-Configure target input
-
-or:
-
-Additional settings
-
-Choose an option such as:
-
-Part of the matched event
-
-or:
-
-Input path
+When configuring the Step Functions target, look for **Configure target input** or **Additional settings**. Choose **Part of the matched event** or **Input path**.
 
 Use:
 
+```text
 $.detail
+```
 
 This is important.
 
 It transforms this:
 
+```json
 {
   "source": "projectx.requests",
   "detail-type": "RequestReceived",
@@ -363,19 +258,23 @@ It transforms this:
     "customerId": "C12345"
   }
 }
+```
 
 into this Step Functions input:
 
+```json
 {
   "requestId": "REQ-4001",
   "requestType": "CHANGE_ADDRESS",
   "customerId": "C12345"
 }
+```
 
 Exactly what your workflow already knows how to process.
 
 Your data path becomes:
 
+```text
 EventBridge event
 
 {
@@ -392,37 +291,25 @@ Step Functions
 {
   business data
 }
+```
 
 That's a very useful pattern.
 
 ## 4.9 Finish creating the rule
 
-Continue through:
-
-Tags
-Review
+Continue through **Tags → Review**.
 
 No tags are necessary for this POC.
 
-Click:
+Click **Create rule**.
 
-Create rule
+You should now have `project-x-request-received-rule` associated with `project-x-poc-bus` and targeting `project-x-poc-workflow`.
 
-You should now have:
-
-project-x-request-received-rule
-
-associated with:
-
-project-x-poc-bus
-
-and targeting:
-
-project-x-poc-workflow
 ## 4.10 Review the architecture
 
 You have:
 
+```text
                 AWS
 
     +-----------------------+
@@ -448,6 +335,7 @@ You have:
     | project-x-poc-        |
     | validator             |
     +-----------------------+
+```
 
 But we haven't tested it yet.
 
@@ -455,14 +343,13 @@ But we haven't tested it yet.
 
 Go to your local project folder:
 
+```bash
 cd project-x-poc
+```
 
-Create:
+Create `eventbridge-request.json`:
 
-eventbridge-request.json
-
-Run:
-
+```bash
 cat > eventbridge-request.json <<'EOF'
 [
   {
@@ -473,26 +360,31 @@ cat > eventbridge-request.json <<'EOF'
   }
 ]
 EOF
+```
 
-Notice something unusual:
-
-"Detail": "{\"requestId\": ... }"
+Notice something unusual: `"Detail": "{\"requestId\": ... }"`.
 
 Detail is passed to the EventBridge API as a JSON-encoded string containing a JSON object. AWS's CLI examples use this same structure.
 
 Check your file:
 
+```bash
 cat eventbridge-request.json
+```
+
 ## 4.12 Send the EventBridge event
 
 Now run:
 
+```bash
 aws events put-events \
   --entries file://eventbridge-request.json \
   --region us-east-1
+```
 
 If everything is correct, you should see something similar to:
 
+```json
 {
   "FailedEntryCount": 0,
   "Entries": [
@@ -501,10 +393,9 @@ If everything is correct, you should see something similar to:
     }
   ]
 }
+```
 
-The important part is:
-
-FailedEntryCount: 0
+The important part is `FailedEntryCount: 0`.
 
 That means EventBridge accepted the event.
 
@@ -514,13 +405,13 @@ AWS assigns an event ID when the event is accepted.
 
 Now go to:
 
+```text
 AWS Console
 → Step Functions
 → project-x-poc-workflow
+```
 
-Look under:
-
-Executions
+Look under **Executions**.
 
 You should see a new execution that you did not manually start.
 
@@ -528,20 +419,19 @@ Open it.
 
 Expected:
 
+```text
 Start
    ↓
 ValidateRequest
    ↓
 Succeeded
+```
 
 This is the important moment.
 
-You did:
+You ran `aws events put-events`, and AWS automatically did:
 
-aws events put-events
-
-and AWS automatically did:
-
+```text
 EventBridge
    ↓
 matched rule
@@ -549,6 +439,7 @@ matched rule
 started Step Functions
    ↓
 called Lambda
+```
 
 You did not manually start the state machine.
 
@@ -556,24 +447,19 @@ You did not manually start the state machine.
 
 Open the new execution.
 
-Look at:
+Look at **Execution input**. Because we configured `$.detail`, you should see something close to:
 
-Execution input
-
-Because we configured:
-
-$.detail
-
-you should see something close to:
-
+```json
 {
   "requestId": "REQ-4001",
   "requestType": "CHANGE_ADDRESS",
   "customerId": "C12345"
 }
+```
 
 If instead you see:
 
+```text
 {
   "version": "0",
   "id": "...",
@@ -581,22 +467,13 @@ If instead you see:
     ...
   }
 }
+```
 
 then EventBridge is sending the entire event.
 
 That's not a disaster.
 
-Go back to:
-
-EventBridge
-→ Rules
-→ project-x-request-received-rule
-→ Edit
-→ Target
-
-and change the target input to:
-
-$.detail
+Go back to **EventBridge → Rules → project-x-request-received-rule → Edit → Target** and change the target input to `$.detail`.
 
 Then test again.
 
@@ -606,6 +483,7 @@ Now let's prove the rule is really doing filtering.
 
 Create:
 
+```bash
 cat > wrong-event.json <<'EOF'
 [
   {
@@ -616,31 +494,27 @@ cat > wrong-event.json <<'EOF'
   }
 ]
 EOF
+```
 
 Send it:
 
+```bash
 aws events put-events \
   --entries file://wrong-event.json \
   --region us-east-1
+```
 
-EventBridge will likely still return:
-
-FailedEntryCount = 0
+EventBridge will likely still return `FailedEntryCount = 0`.
 
 Why?
 
 Because the event itself was valid and successfully sent.
 
-But our rule says:
-
-source must equal projectx.requests
-
-Your event has:
-
-something.else
+But our rule says `source` must equal `projectx.requests`. Your event has `something.else`.
 
 Therefore:
 
+```text
 Event accepted by bus
        ↓
 rule evaluates event
@@ -648,24 +522,21 @@ rule evaluates event
 doesn't match
        ↓
 Step Functions NOT started
+```
 
 Go to Step Functions.
 
-There should be no new execution for REQ-4002.
+There should be no new execution for `REQ-4002`.
 
-This distinction is very important:
+This distinction is very important: an event being accepted does not mean the rule matched.
 
-Event accepted
-
-does not mean:
-
-Rule matched
 ## 4.16 Test invalid business data
 
-Now send another valid EventBridge event, but deliberately omit requestId.
+Now send another valid EventBridge event, but deliberately omit `requestId`.
 
 Create:
 
+```bash
 cat > invalid-request.json <<'EOF'
 [
   {
@@ -676,27 +547,31 @@ cat > invalid-request.json <<'EOF'
   }
 ]
 EOF
+```
 
 Send it:
 
+```bash
 aws events put-events \
   --entries file://invalid-request.json \
   --region us-east-1
+```
 
 Now EventBridge should:
 
+```text
 accept event
  ↓
 match rule
  ↓
 start Step Functions
+```
 
-But your Lambda should fail because:
-
-requestId is required
+But your Lambda should fail because `requestId is required`.
 
 So the execution should follow:
 
+```text
 EventBridge
     ↓
 Step Functions
@@ -704,54 +579,28 @@ Step Functions
 ValidateRequest
     ↓ ERROR
 ValidationFailed
+```
 
 This proves something very important:
 
-EventBridge filtering
-
-asks:
-
-Is this the type of event I'm interested in?
-
-Business validation
-
-asks:
-
-Is the content of this request valid?
+EventBridge filtering asks, “Is this the type of event I'm interested in?” Business validation asks, “Is the content of this request valid?”
 
 Those should generally not be confused.
 
 ## 4.17 Review EventBridge metrics
 
-Go back to:
+Go back to **EventBridge → Rules → project-x-request-received-rule** and look for **Monitoring**. You'll eventually see metrics such as:
 
-EventBridge
-→ Rules
-→ project-x-request-received-rule
-
-Look for:
-
-Monitoring
-
-You'll eventually see metrics such as:
-
-Invocations
-Matched events
-Failed invocations
+- Invocations
+- Matched events
+- Failed invocations
 
 For our POC, you don't need alarms yet.
 
 But remember this location.
 
-Later if:
+Later, if an event is sent but Step Functions doesn't start, one of the first things to investigate is whether the EventBridge rule matched.
 
-event sent
-but
-Step Functions doesn't start
-
-one of the first things to investigate is:
-
-Did the EventBridge rule actually match?
 ## 4.18 Understand the architecture
 
 This is no longer just a chain of manually invoked AWS services.
@@ -760,14 +609,17 @@ You've introduced decoupling.
 
 Without EventBridge:
 
+```text
 Producer
    |
    | must know Step Functions
    v
 Step Functions
+```
 
 With EventBridge:
 
+```text
 Producer
    |
    | publishes business event
@@ -778,51 +630,37 @@ EventBridge
    |         |         |         |
    v         v         v         v
 Workflow   Audit    Metrics    Future
+```
 
-The sender only says:
-
-A request was received.
+The sender only says, “A request was received.”
 
 It does not necessarily have to know all the downstream consumers.
 
 That's one of the reasons EventBridge fits your Project X architecture.
 
-Why we chose RequestReceived
+### Why we chose RequestReceived
 
-Think of:
-
-RequestReceived
-
-as a business event.
+Think of `RequestReceived` as a business event.
 
 Later you could have:
 
-RequestReceived
-
-RequestValidated
-
-IntentIdentified
-
-RequestNeedsInformation
-
-TransactionSubmitted
-
-TransactionCompleted
-
-TransactionFailed
+- `RequestReceived`
+- `RequestValidated`
+- `IntentIdentified`
+- `RequestNeedsInformation`
+- `TransactionSubmitted`
+- `TransactionCompleted`
+- `TransactionFailed`
 
 Do not create all of these yet.
 
-For this POC:
-
-RequestReceived
-
-is enough.
+For this POC, `RequestReceived` is enough.
 
 ### Completed architecture
 
 You should now have:
 
+```text
                          AWS
 
                   +----------------+
@@ -861,19 +699,21 @@ You should now have:
                 |                    |
                 | validator          |
                 +--------------------+
+```
+
 ## Verification checklist
 
-- [x] project-x-poc-bus created
-- [x] project-x-request-received-rule created
-- [x] Pattern source is projectx.requests
-- [x] Pattern detail type is RequestReceived
-- [x] Rule target is project-x-poc-workflow
+- [x] `project-x-poc-bus` created
+- [x] `project-x-request-received-rule` created
+- [x] Pattern source is `projectx.requests`
+- [x] Pattern detail type is `RequestReceived`
+- [x] Rule target is `project-x-poc-workflow`
 - [x] EventBridge can start the workflow
-- [x] Target passes $.detail to Step Functions
-- [x] aws events put-events succeeds
-- [x] REQ-4001 automatically starts Step Functions
+- [x] Target passes `$.detail` to Step Functions
+- [x] `aws events put-events` succeeds
+- [x] `REQ-4001` automatically starts Step Functions
 - [x] Wrong source does not start Step Functions
-- [x] Missing requestId reaches ValidationFailed
+- [x] Missing `requestId` reaches `ValidationFailed`
 
 ## Next Step
 
