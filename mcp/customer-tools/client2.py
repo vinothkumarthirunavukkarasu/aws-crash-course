@@ -53,6 +53,32 @@ async def main() -> None:
 
             print(result)
 
+            print("\n=== UPDATE CUSTOMER ADDRESS ===")
+
+            result = await session.call_tool(
+                "update_customer_address",
+                {
+                    "customer_id": "C12345",
+                    "street": "123 Main Street",
+                    "city": "Jacksonville",
+                    "state": "FL",
+                    "zip_code": "32256",
+                },
+            )
+
+            print(result)
+
+            print("\n=== GET CUSTOMER AFTER UPDATE ===")
+
+            result = await session.call_tool(
+                "get_customer",
+                {
+                    "customer_id": "C12345"
+                },
+            )
+
+            print(result)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
