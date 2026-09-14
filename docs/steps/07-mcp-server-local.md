@@ -19,10 +19,11 @@ Build and test a local Model Context Protocol (MCP) 2.x server with customer too
 - [x] Run the server over Streamable HTTP
 - [x] Connect with an MCP client and call the tools
 
-Step 7 — Build a local MCP 2.x server
+## Overview — Build a local MCP 2.x server
 
 Target:
 
+```text
 Local MCP Client
       |
       | tools/list
@@ -32,88 +33,120 @@ Project X MCPServer
       |
       ├── get_customer
       ├── validate_address
-      └── update_customer_address
+└── update_customer_address
+```
 
 pip install mcp now installs the stable 2.x line. In v2, FastMCP was renamed to MCPServer; @mcp.tool() still works in the same general way.
 
-7.1 Create a clean MCP folder
+## 7.1 Create a clean MCP folder
 
 From your project root:
 
+```bash
 cd ~/github/aws-crash-course
 
 mkdir -p mcp/customer-tools
 cd mcp/customer-tools
+```
 
 Expected:
 
+```text
 aws-crash-course/
 ├── infrastructure/
 └── mcp/
     └── customer-tools/
-7.2 Create a dedicated virtual environment
+```
+## 7.2 Create a dedicated virtual environment
 
 Important because your earlier traceback showed Python using:
 
+```text
 aws-crash-course/.venv
+```
 
 We want:
 
+```text
 aws-crash-course/mcp/customer-tools/.venv
+```
 
 Run:
 
+```bash
 python3 -m venv .venv
 source .venv/bin/activate
+```
 
 Verify:
 
+```bash
 which python
+```
 
 You want something like:
 
+```text
 /Users/webmaster/github/aws-crash-course/mcp/customer-tools/.venv/bin/python
+```
 
 Check Python:
 
+```bash
 python --version
+```
 
 MCP 2.x requires Python 3.10+.
 
-7.3 Install MCP 2.x
+## 7.3 Install MCP 2.x
 
 First:
 
+```bash
 python -m pip install --upgrade pip setuptools wheel
+```
 
 Then:
 
+```bash
 pip install mcp
+```
 
 Verify:
 
+```bash
 pip show mcp
+```
 
 You should see:
 
+```text
 Name: mcp
 Version: 2.x.x
+```
 
 Also verify the import:
 
+```bash
 python -c "from mcp.server import MCPServer; print('MCP 2.x OK')"
+```
 
 Expected:
 
+```text
 MCP 2.x OK
-7.4 Create server.py
+```
+## 7.4 Create server.py
 
 Create:
 
+```bash
 touch server.py
+```
 
 Use this:
 
+```python
 from mcp.server import MCPServer
 
 
@@ -241,22 +274,29 @@ def update_customer_address(
 
 if __name__ == "__main__":
     mcp.run("streamable-http")
+```
 
 In MCP 2.x, the high-level server is:
 
+```python
 from mcp.server import MCPServer
+```
 
 instead of the old:
 
+```python
 from mcp.server.fastmcp import FastMCP
+```
 
 The decorator-oriented API remains, so @mcp.tool() still exposes Python functions as MCP tools.
 
-7.5 Start the server
+## 7.5 Start the server
 
 Run:
 
+```bash
 python server.py
+```
 
 The server should start on port 8000, with MCP available at:
 
@@ -270,19 +310,24 @@ and AWS recommends stateless Streamable HTTP for basic MCP servers.
 
 Keep this terminal running.
 
-7.6 Create the MCP client
+## 7.6 Create the MCP client
 
 Open a second terminal:
 
+```bash
 cd ~/github/aws-crash-course/mcp/customer-tools
 source .venv/bin/activate
+```
 
 Create:
 
+```bash
 touch client.py
+```
 
 Use this first:
 
+```python
 import asyncio
 
 from mcp import ClientSession
@@ -322,25 +367,31 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+```
 
 AWS's current AgentCore local-testing documentation uses this same streamablehttp_client + ClientSession pattern.
 
-7.7 Test tool discovery
+## 7.7 Test tool discovery
 
 Run:
 
+```bash
 python client.py
+```
 
 Expected:
 
+```text
 === AVAILABLE TOOLS ===
 
 - get_customer
 - validate_address
 - update_customer_address
+```
 
 You just performed:
 
+```text
 Client
   |
   | initialize
@@ -351,16 +402,21 @@ MCPServer
   |
   ├─ get_customer
   ├─ validate_address
-  └─ update_customer_address
-7.8 Inspect MCP-generated tool metadata
+└─ update_customer_address
+```
+
+## 7.8 Inspect MCP-generated tool metadata
 
 Change:
 
+```python
 for tool in result.tools:
     print(f"- {tool.name}")
+```
 
 to:
 
+```python
 for tool in result.tools:
 
     print("\nNAME:")
@@ -371,31 +427,41 @@ for tool in result.tools:
 
     print("INPUT SCHEMA:")
     print(tool.inputSchema)
+```
 
 Run again:
 
+```bash
 python client.py
+```
 
 You'll see MCP derive a schema from:
 
+```python
 def get_customer(customer_id: str) -> dict:
+```
 
 plus:
 
+```python
 """Retrieve a customer by customer ID."""
+```
 
 This becomes important later because the agent sees approximately:
 
+```text
 Tool name
 + description
 + input schema
+```
 
 and uses those to decide when and how to call a tool.
 
-7.9 Call get_customer
+## 7.9 Call get_customer
 
 Replace your client with this expanded version:
 
+```python
 import asyncio
 
 from mcp import ClientSession
@@ -446,21 +512,27 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+```
 
 Run:
 
+```bash
 python client.py
+```
 
 You should see data containing:
 
+```text
 C12345
 John Smith
 ACTIVE
 100 Old Street
 Jacksonville
+```
 
 Flow:
 
+```text
 MCP client
     |
     | tools/call
@@ -473,10 +545,12 @@ get_customer()
     |
     v
 CUSTOMERS dictionary
-7.10 Call validate_address
+```
+## 7.10 Call validate_address
 
 Add:
 
+```python
 print("\n=== VALIDATE ADDRESS ===")
 
 result = await session.call_tool(
@@ -490,13 +564,17 @@ result = await session.call_tool(
 )
 
 print(result)
+```
 
 Run:
 
+```bash
 python client.py
+```
 
 Conceptual result:
 
+```json
 {
   "valid": true,
   "errors": [],
@@ -507,28 +585,37 @@ Conceptual result:
     "zip": "32256"
   }
 }
-7.11 Test deterministic failure
+```
+## 7.11 Test deterministic failure
 
 Change:
 
+```python
 "zip_code": "32256"
+```
 
 to:
 
+```python
 "zip_code": "ABC"
+```
 
 Run:
 
+```bash
 python client.py
+```
 
 You should see something equivalent to:
 
+```json
 {
   "valid": false,
   "errors": [
     "zip code must contain 5 digits"
   ]
 }
+```
 
 Important:
 
@@ -536,10 +623,13 @@ No LLM was involved.
 
 The rule lives here:
 
+```python
 if len(zip_code) != 5 or not zip_code.isdigit():
+```
 
 That's exactly what we want for Project X deterministic validation.
 
+```text
 Agent
   |
   | chooses capability
@@ -549,17 +639,21 @@ MCP tool
   | calls deterministic implementation
   v
 Business result
+```
 
 The LLM should not be responsible for remembering that ZIP codes have five digits.
 
-7.12 Call the update tool
+## 7.12 Call the update tool
 
 Restore:
 
+```python
 "zip_code": "32256"
+```
 
 Add:
 
+```python
 print("\n=== UPDATE CUSTOMER ADDRESS ===")
 
 result = await session.call_tool(
@@ -574,9 +668,11 @@ result = await session.call_tool(
 )
 
 print(result)
+```
 
 Then immediately call:
 
+```python
 print("\n=== GET CUSTOMER AFTER UPDATE ===")
 
 result = await session.call_tool(
@@ -587,23 +683,32 @@ result = await session.call_tool(
 )
 
 print(result)
+```
 
 Run:
 
+```bash
 python client.py
+```
 
 You should now see:
 
+```text
 123 Main Street
+```
 
 instead of:
 
+```text
 100 Old Street
-7.13 Important limitation of our mock storage
+```
+## 7.13 Important limitation of our mock storage
 
 If you stop:
 
+```bash
 python server.py
+```
 
 and restart it, the address returns to:
 
@@ -613,12 +718,15 @@ Why?
 
 Because:
 
+```python
 CUSTOMERS = {...}
+```
 
 exists only in memory.
 
 Eventually:
 
+```text
 MCP Tool
    |
    v
@@ -637,15 +745,17 @@ MCP Tool
    |
    v
 Pega API
+```
 
 will replace the dictionary.
 
 We're intentionally avoiding databases in Step 7.
 
-7.14 Understand MCP 2.x server structure
+## 7.14 Understand MCP 2.x server structure
 
 You now have:
 
+```text
 MCPServer
 "Project X Customer Tools"
         |
@@ -657,6 +767,7 @@ MCPServer
         |
         └── Tool
              update_customer_address
+```
 
 An MCP server is not the same thing as a tool.
 
@@ -664,6 +775,7 @@ One server can expose many related tools.
 
 For your enterprise architecture, something like this is reasonable:
 
+```text
 Customer MCP Server
  ├─ get_customer
  ├─ validate_customer
@@ -681,16 +793,20 @@ Pega MCP Server
  ├─ get_case
  ├─ update_case
  └─ close_case
+```
 
 You don't normally need:
 
+```text
 15 MCP tools
 =
 15 MCP servers
-7.15 MCP is not an agent
+```
+## 7.15 MCP is not an agent
 
 Right now you have:
 
+```text
 client.py
      |
      v
@@ -705,11 +821,13 @@ NO Claude
 NO Bedrock model
 NO reasoning
 NO agent
+```
 
 MCP itself is a protocol for exposing capabilities to clients, including LLM applications.
 
 Later we'll change:
 
+```text
 client.py
 
 into something like:
@@ -724,10 +842,13 @@ Claude-powered Agent
         | decides
         v
     tools/call
-7.16 Understand what the future agent will do
+```
+
+## 7.16 Understand what the future agent will do
 
 Suppose the request is:
 
+```json
 {
   "requestType": "CHANGE_ADDRESS",
   "customerId": "C12345",
@@ -738,9 +859,11 @@ Suppose the request is:
     "zip": "32256"
   }
 }
+```
 
 An agent could reason:
 
+```text
 CHANGE_ADDRESS request
         ↓
 I need the customer
@@ -758,20 +881,25 @@ valid=true
 Need to execute update
         ↓
 update_customer_address
+```
 
 MCP gives the agent the standardized capability interface.
 
 It does not determine the workflow by itself.
 
-7.17 An important enterprise design lesson
+## 7.17 An important enterprise design lesson
 
 Our current write tool will happily execute:
 
+```text
 update_customer_address
+```
 
 without requiring:
 
+```text
 validate_address
+```
 
 first.
 
@@ -779,6 +907,7 @@ That isn't strong enough for production.
 
 Eventually your write operation should protect itself:
 
+```text
 update_customer_address
           |
           ├─ authenticate caller
@@ -788,7 +917,8 @@ update_customer_address
           ├─ enforce business invariants
           ├─ check idempotency
           ├─ perform transaction
-          └─ audit
+└─ audit
+```
 
 The agent can orchestrate:
 
@@ -798,19 +928,23 @@ but the write capability must still protect the transaction.
 
 For your hundreds of Project X validations, this distinction will become extremely important.
 
-7.18 Why Streamable HTTP?
+## 7.18 Why Streamable HTTP?
 
 MCP supports multiple transports, but we're intentionally using:
 
+```text
 streamable-http
+```
 
 because that's where you're going next.
 
 AWS AgentCore Runtime currently expects MCP server containers to expose:
 
+```text
 Host: 0.0.0.0
 Port: 8000
 Path: /mcp
+```
 
 and supports Streamable HTTP.
 
@@ -818,14 +952,17 @@ So our local development architecture is already conceptually aligned:
 
 TODAY
 
+```text
 client.py
    |
    | HTTP
    v
 localhost:8000/mcp
+```
 
 Later:
 
+```text
 AWS / Agent
    |
    | InvokeAgentRuntime
@@ -834,10 +971,12 @@ AgentCore Runtime
    |
    v
 0.0.0.0:8000/mcp
-7.19 Don't add AgentCore yet
+```
+## 7.19 Don't add AgentCore yet
 
 For Step 7, don't install or configure:
 
+```text
 AgentCore CLI
 Docker
 ECR
@@ -849,45 +988,48 @@ OAuth
 Entra ID
 Pega
 DataPower
+```
 
 They'll make it harder to understand what MCP itself is doing.
 
 Our only objective right now is:
 
+```text
 Can I expose Python capabilities as MCP 2.x tools
 and call them through MCP?
-Step 7 completion checklist
+```
+## Step 7 completion checklist
 
 You're done with Step 7 when:
 
-[ ] customer-tools/.venv exists
+- [x] customer-tools/.venv exists
 
-[ ] which python points to customer-tools/.venv
+- [x] which python points to customer-tools/.venv
 
-[ ] pip show mcp reports 2.x
+- [x] pip show mcp reports 2.x
 
-[ ] MCPServer import works
+- [x] MCPServer import works
 
-[ ] server.py starts
+- [x] server.py starts
 
-[ ] localhost:8000/mcp is available
+- [x] localhost:8000/mcp is available
 
-[ ] client.py connects
+- [x] client.py connects
 
-[ ] tools/list returns:
-    get_customer
-    validate_address
-    update_customer_address
+- [x] tools/list returns:
+  - get_customer
+  - validate_address
+  - update_customer_address
 
-[ ] get_customer("C12345") works
+- [x] get_customer("C12345") works
 
-[ ] valid address returns valid=true
+- [x] valid address returns valid=true
 
-[ ] invalid ZIP returns valid=false
+- [x] invalid ZIP returns valid=false
 
-[ ] update_customer_address works
+- [x] update_customer_address works
 
-[ ] subsequent get_customer shows new address
+- [x] subsequent get_customer shows new address
 
 Once this works, Step 8 will take this exact MCP 2.x server and make it deployable to Amazon Bedrock AgentCore Runtime, including the container/runtime requirements and local deployment testing. AgentCore currently requires an ARM64 container, port 8000, and /mcp for MCP workloads
 

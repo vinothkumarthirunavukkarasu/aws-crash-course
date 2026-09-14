@@ -4,7 +4,7 @@
 
 ## Objective
 
-Expose the Step Function from Step 3 via a REST API.
+Expose the event-driven Step Function workflow through an API Gateway HTTP API.
 
 ## Prerequisites
 
@@ -23,10 +23,13 @@ Expose the Step Function from Step 3 via a REST API.
 - [x] HTTP request to the API endpoint triggers the Step Function
 - [x] API returns expected response
 
-Step 5 adds API Gateway. After this step, you won't need aws events put-events to start Project X.
+## Overview
+
+Step 5 adds API Gateway. After this step, you won't need `aws events put-events` to start Project X.
 
 The target is:
 
+```text
 curl / Postman
       │
       │ POST /requests
@@ -48,89 +51,58 @@ project-x-poc-workflow
       ▼
 Lambda
 project-x-poc-validator
+```
 
-We'll use API Gateway HTTP API → EventBridge directly. API Gateway supports the EventBridge-PutEvents AWS service integration, so we don't need another Lambda just to publish the event. AWS documentation: HTTP API AWS service integrations
+We'll use API Gateway HTTP API → EventBridge directly. API Gateway supports the `EventBridge-PutEvents` AWS service integration, so we don't need another Lambda just to publish the event. AWS documentation: HTTP API AWS service integrations.
 
 ## 5.1 Create an HTTP API
 
-Go to:
-
-AWS Console
-→ API Gateway
-→ APIs
-→ Create API
+Go to **AWS Console → API Gateway → APIs → Create API**.
 
 You'll see different API types.
 
-Find:
-
-HTTP API
-
-and click Build.
+Find **HTTP API** and click **Build**.
 
 Make sure you're creating an HTTP API, not REST API.
 
-Name it:
-
-project-x-poc-api
+Name it `project-x-poc-api`.
 
 If the console asks you to add an integration immediately, look for an AWS service integration. Depending on the current console flow, you may also be able to create the API first and add the integration afterward.
 
-Our desired route is:
+Our desired route is `POST /requests`.
 
-POST /requests
 ## 5.2 Understand what we're building
 
-Previously you manually ran:
-
-aws events put-events ...
+Previously you manually ran `aws events put-events ...`.
 
 Essentially telling EventBridge:
 
+```json
 {
   "Source": "projectx.requests",
   "DetailType": "RequestReceived",
   "Detail": "{...}",
   "EventBusName": "project-x-poc-bus"
 }
+```
 
 Now API Gateway will do that for you.
 
 The caller sends:
 
+```json
 {
   "requestId": "REQ-5001",
   "requestType": "CHANGE_ADDRESS",
   "customerId": "C12345"
 }
+```
 
 API Gateway turns that into an EventBridge PutEvents call.
 
 ## 5.3 Create the EventBridge integration
 
-Inside your HTTP API, find:
-
-Integrations
-
-Choose:
-
-Create integration
-
-For integration type, select:
-
-AWS service
-
-Select:
-
-EventBridge
-
-and then:
-
-PutEvents
-
-The important integration subtype is:
-
-EventBridge-PutEvents
+Inside your HTTP API, open **Integrations → Create integration**. Select **AWS service → EventBridge → PutEvents**. The integration subtype is `EventBridge-PutEvents`.
 
 If your console shows Integration subtype, select exactly that.
 
@@ -138,14 +110,11 @@ If your console shows Integration subtype, select exactly that.
 
 This is another place where our IAM pattern repeats.
 
-API Gateway needs permission to call:
-
-events:PutEvents
-
-because API Gateway is going to publish to EventBridge.
+API Gateway needs `events:PutEvents` permission because it publishes to EventBridge.
 
 Our permissions now look like:
 
+```text
 API Gateway
      │
      │ events:PutEvents
@@ -163,35 +132,17 @@ Step Functions
      │ lambda:InvokeFunction
      ▼
 Lambda
+```
 
 You may need to provide an IAM role for the integration.
 
 If the console offers to create/manage the role, use that option.
 
-If it requires you to create one manually, go to:
-
-IAM
-→ Roles
-→ Create role
-
-For trusted entity/service choose:
-
-API Gateway
-
-Name it:
-
-project-x-api-eventbridge-role
-
-Give it permission to:
-
-events:PutEvents
-
-Ideally only against your:
-
-project-x-poc-bus
+If it requires you to create one manually, go to **IAM → Roles → Create role**. Choose **API Gateway** as the trusted service and name the role `project-x-api-eventbridge-role`. Grant it `events:PutEvents` permission, ideally scoped to `project-x-poc-bus`.
 
 For this POC, a policy conceptually looks like:
 
+```json
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -202,18 +153,15 @@ For this POC, a policy conceptually looks like:
     }
   ]
 }
+```
 
-You can find your bus ARN under:
-
-EventBridge
-→ Event buses
-→ project-x-poc-bus
+You can find your bus ARN under **EventBridge → Event buses → project-x-poc-bus**.
 
 It will look approximately like:
 
-arn:aws:events:us-east-1:
-123456789012:
-event-bus/project-x-poc-bus
+```text
+arn:aws:events:us-east-1:123456789012:event-bus/project-x-poc-bus
+```
 
 Don't copy the example ARN; use yours.
 
@@ -225,56 +173,32 @@ The integration needs to construct the EventBridge event.
 
 Configure:
 
-Source
-projectx.requests
-DetailType
-RequestReceived
-EventBusName
-project-x-poc-bus
+| Parameter | Value |
+| --- | --- |
+| `Source` | `projectx.requests` |
+| `DetailType` | `RequestReceived` |
+| `EventBusName` | `project-x-poc-bus` |
+| `Detail` | HTTP request body, typically `$request.body` in an HTTP API parameter mapping |
 
-For:
-
-Detail
-
-we want the HTTP request body.
-
-For an HTTP API parameter mapping, this is typically:
-
-$request.body
-
-So conceptually API Gateway creates:
-
-Source
-     = projectx.requests
-
-DetailType
-     = RequestReceived
-
-EventBusName
-     = project-x-poc-bus
-
-Detail
-     = $request.body
+Conceptually, API Gateway creates `Source = projectx.requests`, `DetailType = RequestReceived`, `EventBusName = project-x-poc-bus`, and `Detail = $request.body`.
 
 This is the key mapping.
 
 ## 5.6 Understand the transformation
 
-Suppose your caller sends:
+Suppose your caller sends `POST /requests` with `Content-Type: application/json` and this body:
 
-POST /requests
-Content-Type: application/json
-
-with:
-
+```json
 {
   "requestId": "REQ-5001",
   "requestType": "CHANGE_ADDRESS",
   "customerId": "C12345"
 }
+```
 
 API Gateway effectively publishes:
 
+```json
 {
   "source": "projectx.requests",
   "detail-type": "RequestReceived",
@@ -284,9 +208,11 @@ API Gateway effectively publishes:
     "customerId": "C12345"
   }
 }
+```
 
 EventBridge then evaluates your Step 4 rule:
 
+```json
 {
   "source": [
     "projectx.requests"
@@ -295,20 +221,19 @@ EventBridge then evaluates your Step 4 rule:
     "RequestReceived"
   ]
 }
+```
 
 It matches.
 
-Then because we configured:
+Then, because we configured `$.detail` in Step 4, Step Functions receives:
 
-$.detail
-
-in Step 4, Step Functions receives:
-
+```json
 {
   "requestId": "REQ-5001",
   "requestType": "CHANGE_ADDRESS",
   "customerId": "C12345"
 }
+```
 
 And your existing Lambda already understands that.
 
@@ -320,28 +245,17 @@ We're simply adding another component in front of what already works.
 
 Now create a route.
 
-Go to:
-
-API Gateway
-→ project-x-poc-api
-→ Routes
-
-Create:
-
-POST /requests
+Go to **API Gateway → project-x-poc-api → Routes** and create `POST /requests`.
 
 Be careful with the HTTP method.
 
-We want:
-
-POST
-
-not GET.
+We want `POST`, not `GET`.
 
 Attach your EventBridge integration to this route.
 
 The relationship becomes:
 
+```text
 project-x-poc-api
 
 Route
@@ -350,32 +264,19 @@ POST /requests
        ▼
 Integration
 EventBridge-PutEvents
+```
+
 ## 5.8 Configure the stage
 
-HTTP APIs normally have a:
-
-$default
-
-stage.
+HTTP APIs normally have a `$default` stage.
 
 For our POC, that's fine.
 
-Enable:
+Enable **Auto-deploy** if it isn't already enabled.
 
-Auto-deploy
+That means changes to your API configuration are automatically deployed to the `$default` stage.
 
-if it isn't already enabled.
-
-That means changes to your API configuration are automatically deployed to the $default stage.
-
-You do not need:
-
-dev
-test
-qa
-prod
-
-stages yet.
+You do not need `dev`, `test`, `qa`, or `prod` stages yet.
 
 We'll deal with environment separation later.
 
@@ -385,11 +286,15 @@ Go to your API details.
 
 You should see an Invoke URL or API endpoint similar to:
 
+```text
 https://abc123xyz.execute-api.us-east-1.amazonaws.com
+```
 
 Therefore your endpoint is:
 
+```text
 https://abc123xyz.execute-api.us-east-1.amazonaws.com/requests
+```
 
 Don't use that example URL; copy yours from the console.
 
@@ -399,6 +304,7 @@ Now go to your Mac Terminal.
 
 Run:
 
+```bash
 curl -i -X POST \
   'YOUR_API_ENDPOINT/requests' \
   -H 'Content-Type: application/json' \
@@ -407,12 +313,15 @@ curl -i -X POST \
     "requestType": "CHANGE_ADDRESS",
     "customerId": "C12345"
   }'
+```
 
 For example:
 
+```text
 POST
    ↓
 https://abc123.execute-api.us-east-1.amazonaws.com/requests
+```
 
 API Gateway should return a successful HTTP response.
 
@@ -426,29 +335,15 @@ Our architecture is currently asynchronous.
 
 This is the real test.
 
-Go to:
-
-AWS Console
-→ Step Functions
-→ project-x-poc-workflow
-→ Executions
+Go to **AWS Console → Step Functions → project-x-poc-workflow → Executions**.
 
 You should see a new execution.
 
-You did not:
-
-Start execution
-
-and you did not:
-
-aws events put-events
-
-You only made:
-
-HTTP POST /requests
+You did not click **Start execution** or run `aws events put-events`. You only made `HTTP POST /requests`.
 
 Yet AWS should have done:
 
+```text
 HTTP POST
    ↓
 API Gateway
@@ -466,26 +361,31 @@ ValidateRequest
 Lambda
    ↓
 Succeeded
+```
 
 Open the execution.
 
 The input should be:
 
+```json
 {
   "requestId": "REQ-5001",
   "requestType": "CHANGE_ADDRESS",
   "customerId": "C12345"
 }
+```
 
 And ValidateRequest should be green.
 
 If that happens:
 
 🎯 Your first end-to-end AWS ingress POC works.
+
 ## 5.12 Test invalid business data
 
 Now try:
 
+```bash
 curl -i -X POST \
   'YOUR_API_ENDPOINT/requests' \
   -H 'Content-Type: application/json' \
@@ -493,12 +393,9 @@ curl -i -X POST \
     "requestType": "CHANGE_ADDRESS",
     "customerId": "C12345"
   }'
+```
 
-Notice:
-
-requestId
-
-is missing.
+Notice `requestId` is missing.
 
 What do you expect?
 
@@ -506,6 +403,7 @@ API Gateway itself currently doesn't know that's invalid.
 
 Therefore:
 
+```text
 API Gateway
     ↓
 accepts HTTP request
@@ -529,6 +427,7 @@ Lambda detects missing requestId
 Catch
     ↓
 ValidationFailed
+```
 
 Go to Step Functions and confirm exactly that happens.
 
@@ -538,24 +437,16 @@ This is useful because you're starting to see separation of responsibilities.
 
 At this point:
 
-API Gateway answers:
-
-How does an external caller enter my AWS application?
-
-EventBridge answers:
-
-What business event occurred, and which consumers care about it?
-
-Step Functions answers:
-
-What workflow should happen because of that event?
-
-Lambda answers:
-
-Perform this specific deterministic piece of work.
+| Service | Responsibility |
+| --- | --- |
+| API Gateway | How does an external caller enter my AWS application? |
+| EventBridge | What business event occurred, and which consumers care about it? |
+| Step Functions | What workflow should happen because of that event? |
+| Lambda | Perform this specific deterministic piece of work. |
 
 So:
 
+```text
 API Gateway
      │
      │ ingress
@@ -573,6 +464,7 @@ Lambda
      │ deterministic logic
      ▼
 Business outcome
+```
 
 This separation is fundamental to the architecture you're learning.
 
@@ -582,6 +474,7 @@ This is important.
 
 You might expect:
 
+```text
 curl
  ↓
 API Gateway
@@ -593,11 +486,13 @@ Lambda
 "VALID"
  ↓
 curl receives VALID
+```
 
 But that's not what we've built.
 
 We've built:
 
+```text
 Caller
    │
    │ POST request
@@ -611,10 +506,12 @@ EventBridge
    └── API request accepted
           ↓
       HTTP response
+```
 
 
 Meanwhile asynchronously:
 
+```text
 EventBridge
    ↓
 Step Functions
@@ -622,14 +519,9 @@ Step Functions
 Lambda
    ↓
 processing continues
+```
 
-The HTTP request is effectively saying:
-
-"Project X, here's a request for you to process."
-
-Not:
-
-"Keep my HTTP connection open until the entire business transaction finishes."
+The HTTP request is effectively saying, “Project X, here's a request for you to process,” rather than “Keep my HTTP connection open until the entire business transaction finishes.”
 
 This asynchronous model fits your eventual Project X workflow well because some requests could involve multiple validations, agents, external APIs, Pega transactions, follow-up communication, retries, and potentially long-running processing.
 
@@ -637,20 +529,11 @@ This asynchronous model fits your eventual Project X workflow well because some 
 
 You can also use Postman.
 
-Method:
-
-POST
-
-URL:
-
-YOUR_API_ENDPOINT/requests
-
-Header:
-
-Content-Type: application/json
+Use method `POST`, URL `YOUR_API_ENDPOINT/requests`, and header `Content-Type: application/json`.
 
 Body → raw → JSON:
 
+```json
 {
   "requestId": "REQ-5002",
   "requestType": "CHANGE_ADDRESS",
@@ -662,6 +545,7 @@ Body → raw → JSON:
     "zip": "32256"
   }
 }
+```
 
 Send.
 
@@ -669,11 +553,7 @@ Then check Step Functions.
 
 ## 5.16 Look at API Gateway metrics
 
-Go to:
-
-API Gateway
-→ project-x-poc-api
-→ Monitor
+Go to **API Gateway → project-x-poc-api → Monitor**.
 
 You'll eventually see metrics such as requests, latency, 4xx responses, and 5xx responses.
 
@@ -685,6 +565,7 @@ We're just learning where to look.
 
 You now have several independent identities:
 
+```text
              API Gateway
                   │
         project-x-api-eventbridge-role
@@ -708,6 +589,7 @@ You now have several independent identities:
          Lambda execution role
                   │
              CloudWatch
+```
 
 This is a key AWS lesson:
 
@@ -715,6 +597,7 @@ The AWS service performing an action needs authorization to perform that action.
 
 Later you'll extend this:
 
+```text
 Step Functions/Lambda
        │
        │ bedrock-agentcore:InvokeAgentRuntime
@@ -724,31 +607,27 @@ AgentCore Runtime
        │ bedrock:InvokeModel
        ▼
 Claude
+```
+
 ## 5.18 Don't add authentication yet
 
 Your POC API is currently effectively:
 
+```text
 POST /requests
     ↓
 No application authentication
+```
 
 That's okay temporarily for the learning POC, but don't treat that as a production design.
 
-Don't add:
-
-Entra ID
-OAuth
-JWT Authorizer
-mTLS
-DataPower
-WAF
-
-yet.
+Don't add Entra ID, OAuth, JWT Authorizer, mTLS, DataPower, or WAF yet.
 
 We'll do security after the core flow works.
 
 For your eventual architecture, the ingress becomes much more like:
 
+```text
 On-prem producer
        ↓
 IBM DataPower
@@ -758,13 +637,15 @@ OAuth / mTLS
 API Gateway
        ↓
 EventBridge
+```
 
 But adding all that now would obscure what you're learning.
 
-Step 5 completion test
+## Step 5 completion test
 
 Your final test should be:
 
+```bash
 curl -X POST \
   'YOUR_API_ENDPOINT/requests' \
   -H 'Content-Type: application/json' \
@@ -773,9 +654,11 @@ curl -X POST \
     "requestType": "CHANGE_ADDRESS",
     "customerId": "C12345"
   }'
+```
 
 Then verify:
 
+```text
 POST /requests
       │
       ▼
@@ -798,24 +681,25 @@ project-x-poc-validator
       │
       ▼
 VALID
+```
 
 Your checklist is:
 
-- [x] project-x-poc-api exists
+- [x] `project-x-poc-api` exists
 - [x] API type = HTTP API
-- [x] POST /requests exists
-- [x] Integration = EventBridge-PutEvents
-- [x] Source = projectx.requests
-- [x] DetailType = RequestReceived
-- [x] EventBusName = project-x-poc-bus
+- [x] `POST /requests` exists
+- [x] Integration = `EventBridge-PutEvents`
+- [x] `Source = projectx.requests`
+- [x] `DetailType = RequestReceived`
+- [x] `EventBusName = project-x-poc-bus`
 - [x] Detail = HTTP request body
-- [x] API Gateway IAM role can events:PutEvents
-- [x] curl returns successful HTTP response
+- [x] API Gateway IAM role can `events:PutEvents`
+- [x] `curl` returns successful HTTP response
 - [x] EventBridge rule matches
 - [x] Step Functions starts automatically
-- [x] REQ-5003 appears as workflow input
-- [x] ValidateRequest succeeds
-- [x] Invalid request reaches ValidationFailed
+- [x] `REQ-5003` appears as workflow input
+- [x] `ValidateRequest` succeeds
+- [x] Invalid request reaches `ValidationFailed`
 
 Once REQ-5003 goes from curl all the way to your Lambda, stop there. Step 5 is complete.
 
