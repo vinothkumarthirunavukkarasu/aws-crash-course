@@ -28,6 +28,14 @@ jobs:
         run: |
           aws sts get-caller-identity
 
-      - name: Verify AWS region
+      - name: Verify AWS connection
         run: |
-          aws configure get region
+          echo "=== AWS Identity ==="
+          aws sts get-caller-identity
+      
+          echo "=== AWS Region ==="
+          echo "AWS_REGION=$AWS_REGION"
+          echo "AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION"
+      
+          echo "=== AWS CLI ==="
+          aws --version
