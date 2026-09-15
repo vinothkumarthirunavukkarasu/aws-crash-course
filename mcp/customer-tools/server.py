@@ -119,4 +119,9 @@ def update_customer_address(
 
 
 if __name__ == "__main__":
-    mcp.run("streamable-http")
+    mcp.run(
+        "streamable-http",
+        host="0.0.0.0",
+        port=8000,
+        stateless_http=True,
+    )
