@@ -25,13 +25,17 @@ Host the MCP server from Step 7 on AgentCore Runtime.
 - [ ] MCP server responds to invocations
 
 
-# Project X — Step 8: Deploy MCP 2.x Customer Tools to Amazon Bedrock AgentCore Runtime
+## Deployment guide
 
-**Status:** Ready to start  
-**Region:** `us-east-1`  
-**Verified against current AWS / MCP documentation:** 2026-09-13  
-**Previous step:** Step 7 — Local MCP 2.x server with `MCPServer`  
-**Goal:** Take the working local MCP 2.x customer-tools server and make it deployable to Amazon Bedrock AgentCore Runtime.
+Project X — Step 8: Deploy MCP 2.x Customer Tools to Amazon Bedrock AgentCore Runtime.
+
+| Item | Value |
+| --- | --- |
+| Status | Ready to start |
+| Region | `us-east-1` |
+| Documentation verified | 2026-09-13 |
+| Previous step | Step 7 — Local MCP 2.x server with `MCPServer` |
+| Goal | Take the working local MCP 2.x customer-tools server and make it deployable to Amazon Bedrock AgentCore Runtime. |
 
 ---
 
@@ -1332,55 +1336,27 @@ They are important, but Step 8 has one purpose:
 
 ## 27. Step 8 completion checklist
 
-```text
-[ ] Step 7 MCP 2.x server still works locally
-
-[ ] server.py uses:
-    from mcp.server import MCPServer
-
-[ ] server runs with:
-    streamable-http
-    0.0.0.0
-    port 8000
-    stateless_http=True
-
-[ ] requirements pin MCP 2.x:
-    mcp>=2,<3
-
-[ ] Node.js 20+ available
-
-[ ] AWS CLI identity works
-
-[ ] AWS region is us-east-1
-
-[ ] AgentCore CLI installed
-
-[ ] agentcore --version works
-
-[ ] AgentCore project created
-
-[ ] MCP runtime added
-
-[ ] generated runtime uses our MCP 2.x server.py
-
-[ ] dependency configuration contains MCP 2.x
-
-[ ] agentcore deploy --dry-run succeeds
-
-[ ] agentcore deploy succeeds
-
-[ ] agentcore status shows healthy runtime
-
-[ ] runtime ARN captured
-
-[ ] remote tools/list works
-
-[ ] remote get_customer works
-
-[ ] remote validate_address works
-
-[ ] CloudWatch logs are visible
-```
+- [ ] Step 7 MCP 2.x server still works locally
+- [ ] `server.py` uses `from mcp.server import MCPServer`
+- [ ] Server uses `streamable-http`, host `0.0.0.0`, port `8000`, and `stateless_http=True`
+- [ ] Requirements pin MCP 2.x with `mcp>=2,<3`
+- [ ] Node.js 20+ is available
+- [ ] AWS CLI identity works
+- [ ] AWS Region is `us-east-1`
+- [ ] AgentCore CLI is installed
+- [ ] `agentcore --version` works
+- [ ] AgentCore project is created
+- [ ] MCP runtime is added
+- [ ] Generated runtime uses the MCP 2.x `server.py`
+- [ ] Dependency configuration contains MCP 2.x
+- [ ] `agentcore deploy --dry-run` succeeds
+- [ ] `agentcore deploy` succeeds
+- [ ] `agentcore status` shows a healthy runtime
+- [ ] Runtime ARN is captured
+- [ ] Remote `tools/list` works
+- [ ] Remote `get_customer` works
+- [ ] Remote `validate_address` works
+- [ ] CloudWatch logs are visible
 
 ---
 
@@ -1463,31 +1439,17 @@ Tools         = deterministic actions
 
 ### AWS
 
-1. Amazon Bedrock AgentCore — Deploy MCP servers in AgentCore Runtime  
-   https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-mcp.html
-
-2. Amazon Bedrock AgentCore — MCP protocol contract  
-   https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-mcp-protocol-contract.html
-
-3. Amazon Bedrock AgentCore — Get started with the AgentCore CLI  
-   https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-get-started-cli.html
-
-4. Amazon Bedrock AgentCore — Invoke an AgentCore Runtime agent  
-   https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-invoke-agent.html
-
-5. Amazon Bedrock AgentCore — Authentication and authorization  
-   https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-oauth.html
+1. [Deploy MCP servers in AgentCore Runtime](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-mcp.html)
+2. [MCP protocol contract](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-mcp-protocol-contract.html)
+3. [Get started with the AgentCore CLI](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-get-started-cli.html)
+4. [Invoke an AgentCore Runtime agent](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-invoke-agent.html)
+5. [Authentication and authorization](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-oauth.html)
 
 ### MCP Python SDK
 
-6. Official Model Context Protocol Python SDK  
-   https://github.com/modelcontextprotocol/python-sdk
-
-7. MCP Python SDK — ASGI / Streamable HTTP deployment  
-   https://github.com/modelcontextprotocol/python-sdk/blob/main/docs/run/asgi.md
-
-8. MCP Python SDK — v2 changes  
-   https://github.com/modelcontextprotocol/python-sdk/blob/main/docs/whats-new.md
+1. [Official Model Context Protocol Python SDK](https://github.com/modelcontextprotocol/python-sdk)
+2. [ASGI and Streamable HTTP deployment](https://github.com/modelcontextprotocol/python-sdk/blob/main/docs/run/asgi.md)
+3. [MCP Python SDK v2 changes](https://github.com/modelcontextprotocol/python-sdk/blob/main/docs/whats-new.md)
 
 ---
 
@@ -1514,8 +1476,7 @@ Then continue to installing/verifying the AgentCore CLI.
 
 ---
 
-**Project X learning rule:** one infrastructure concept at a time. Do not add Gateway, Cognito, Entra ID, VPC networking, RDS or the LLM agent until the single MCP Runtime deployment is understood and working.
-
+> **Project X learning rule:** One infrastructure concept at a time. Do not add Gateway, Cognito, Entra ID, VPC networking, RDS, or the LLM agent until the single MCP Runtime deployment is understood and working.
 
 ## Next Step
 
